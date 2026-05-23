@@ -48,19 +48,40 @@ function getDatabaseConfig() {
 }
 
 async function initialize() {
+    // 1. Grab the parsed configuration values
     const { host, port, user, password, database, ssl } = getDatabaseConfig();
 
+    // 2. If SSL is required by the cluster, we must pass it here too
     if (process.env.NODE_ENV !== 'production' && host === 'localhost') {
-        const connection = await mysql.createConnection({ host, port, user, password });
+        const connection = await mysql.createConnection({ 
+            host, 
+            port, 
+            user, 
+            password,
+            ...(ssl ? { ssl: { rejectUnauthorized: true } } : {}) 
+        });
         await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
     }
 
-    const sequelize = new Sequelize(database, user, password, {
-        host,
-        port,
-        dialect: 'mysql',
-        dialectOptions: ssl ? { ssl: { rejectUnauthorized: false } } : undefined
-    });
+    // 3. Use the destructured variables here so your fallbacks actually work!
+    const sequelize = new Sequelize(
+        database, 
+        user, 
+        password, 
+        {
+            host: host,
+            port: port,
+            dialect: 'mysql',
+            dialectOptions: {
+                // Only enforce SSL if your config says it's required
+                ...(ssl ? {
+                    ssl: {
+                        rejectUnauthorized: true
+                    }
+                } : {})
+            }
+        }
+    );
 
     db.Account = accountModel(sequelize);
     db.RefreshToken = refreshTokenModel(sequelize);
